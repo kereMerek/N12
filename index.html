@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karanlığımda Bir Işık</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030613;
+            --text-color: #fdf6e3;
+            --highlight: #4dabf7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            font-family: 'Lora', serif;
+            color: var(--text-color);
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Fixed background canvas */
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Warm glow overlay that appears when reading */
+        #glowOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(15, 35, 75, 0.8) 0%, rgba(3, 6, 19, 0) 80%);
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 3s ease-in-out;
+            pointer-events: none;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 2rem;
+            transition: opacity 1.5s ease-in-out, visibility 1.5s;
+        }
+
+        /* Intro Screen */
+        #introScreen {
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .glowing-heart {
+            width: 80px;
+            height: 80px;
+            filter: drop-shadow(0 0 15px rgba(77, 171, 247, 0.6));
+            animation: heartPulse 2.5s infinite ease-in-out;
+            transition: all 1s ease-out;
+        }
+
+        @keyframes heartPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(77, 171, 247, 0.4)); }
+            50% { transform: scale(1.15); filter: drop-shadow(0 0 30px rgba(77, 171, 247, 0.9)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(77, 171, 247, 0.4)); }
+        }
+
+        .heart-expand {
+            animation: heartExplode 0.6s ease-out forwards;
+        }
+
+        @keyframes heartExplode {
+            0% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(77, 171, 247, 0.9)); opacity: 1; }
+            50% { filter: drop-shadow(0 0 100px rgba(77, 171, 247, 1)); }
+            100% { transform: scale(5); opacity: 0; filter: drop-shadow(0 0 150px rgba(77, 171, 247, 0)); }
+        }
+
+        .tap-text {
+            font-size: 1.1rem;
+            color: rgba(253, 246, 227, 0.6);
+            font-style: italic;
+            letter-spacing: 2px;
+            animation: textPulse 3s infinite 1s;
+            transition: opacity 0.5s ease;
+        }
+
+        @keyframes textPulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.4; }
+        }
+
+        /* Main Screen */
+        #mainScreen {
+            opacity: 0;
+            visibility: hidden;
+            justify-content: flex-start; /* Allow scrolling if text is long */
+            padding-top: 10vh;
+            padding-bottom: 10vh;
+        }
+
+        .content-box {
+            max-width: 600px;
+            width: 100%;
+            text-align: left;
+            position: relative;
+            z-index: 10;
+        }
+
+        .paragraph {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            transition: opacity 1.5s ease-out, transform 1.5s ease-out;
+        }
+
+        .paragraph.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .signature {
+            text-align: right;
+            margin-top: 3rem;
+            font-style: italic;
+            color: var(--highlight);
+            font-size: 1.2rem;
+            text-shadow: 0 0 8px rgba(77, 171, 247, 0.3);
+        }
+
+        /* Utility class for hiding */
+        .hidden-screen {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none;
+        }
+
+        @media (max-width: 480px) {
+            .pulse-text { font-size: 1.5rem; }
+            .paragraph { font-size: 1.05rem; }
+            .screen { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Particle Background -->
+    <canvas id="particleCanvas"></canvas>
+    
+    <!-- Warm Glow Effect for reading -->
+    <div id="glowOverlay"></div>
+
+    <!-- Intro: Click to open -->
+    <div id="introScreen" class="screen">
+        <svg class="glowing-heart" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#4dabf7"/>
+        </svg>
+        <span class="tap-text">Dokun...</span>
+    </div>
+
+    <!-- Main Content: Hidden initially -->
+    <div id="mainScreen" class="screen">
+        <div class="content-box">
+            <p class="paragraph">Ne kadar hatırlıyosun ya da hala açıp bakıyo musun bilmiyorum sana bi şiir yazmıştım ya " karanlığımda bir ışık " diye beni ne kadar değiştirdiğini hayatı nasıl sevdirdiğini anlatmak istemiştim.</p>
+            
+            <p class="paragraph">Hiç bişeye hevesinin kalmamasını , yaşamak için bile hevesinin olmamasını gördükçe dayanamıyorum çok canım yanıyo çünkü bana hayatı yaşamayı sen sevdirdin.</p>
+            
+            <p class="paragraph">Artık ben istiyorum senin gibi usulca yanına oturup hiç bişey demeden kalbine dokunmayı , karanlığını silemesem bile elini tutup senle birlikte ışığa yürümeyi.</p>
+            
+            <p class="paragraph">Tüm kalbimle inanıyorum bitanemmm her şey güzel olucakkk bu günlerde gelip geçici biraz zamana ihtiyacımız var o kadar.</p>
+            
+            <p class="paragraph">Ben her daim senin yanındayımmmm. Canın sıkıldığında istediğin gibi arayabilirsin mesaj atabilirsin ben sana hep müsaitimm benimde durumum kötü diye korkma ya da çekinme ben hep burdayım yanında olmasam bile kalbindeyim.</p>
+
+            <p class="paragraph">Kusur sandığın her zerrene hala kör kütük aşığımmm.</p>
+            
+            <p class="paragraph signature">- Seni her daim kalbinde saklayan Kerem 💙</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Particle/Firefly System ---
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let particles = [];
+        let burstParticles = [];
+        const particleCount = 80; // Adjust for density
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 2 + 0.5; // Random size
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+                // Varying colors between white and soft blue
+                this.color = Math.random() > 0.5 ? 'rgba(253, 246, 227, ' : 'rgba(77, 171, 247, ';
+                this.opacity = Math.random() * 0.5 + 0.2;
+                this.glow = Math.random() * 10 + 5;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                // Gentle drifting bounds
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+                
+                // Pulsing effect
+                this.opacity += (Math.random() - 0.5) * 0.01;
+                if(this.opacity < 0.1) this.opacity = 0.1;
+                if(this.opacity > 0.8) this.opacity = 0.8;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color + this.opacity + ')';
+                ctx.shadowBlur = this.glow;
+                ctx.shadowColor = this.color + '1)';
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        class BurstParticle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 3 + 1;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 12 + 3; // Hızlı fırlama
+                this.speedX = Math.cos(angle) * speed;
+                this.speedY = Math.sin(angle) * speed;
+                this.color = 'rgba(77, 171, 247, ';
+                this.opacity = 1;
+                this.decay = Math.random() * 0.015 + 0.01;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.opacity -= this.decay;
+            }
+            draw() {
+                if(this.opacity <= 0) return;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color + this.opacity + ')';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color + '1)';
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            burstParticles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            
+            // Draw burst particles
+            for (let i = burstParticles.length - 1; i >= 0; i--) {
+                burstParticles[i].update();
+                burstParticles[i].draw();
+                if (burstParticles[i].opacity <= 0) {
+                    burstParticles.splice(i, 1);
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        initParticles();
+        animate();
+
+
+        // --- Interaction Logic ---
+        const introScreen = document.getElementById('introScreen');
+        const mainScreen = document.getElementById('mainScreen');
+        const glowOverlay = document.getElementById('glowOverlay');
+        const paragraphs = document.querySelectorAll('.paragraph');
+        
+        let isOpened = false;
+
+        introScreen.addEventListener('click', (e) => {
+            if (isOpened) return;
+            isOpened = true;
+
+            const heart = document.querySelector('.glowing-heart');
+            const tapText = document.querySelector('.tap-text');
+
+            // Burst Effect Position
+            const rect = heart.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Generate burst particles
+            for(let i = 0; i < 60; i++) {
+                burstParticles.push(new BurstParticle(centerX, centerY));
+            }
+
+            // 1. Yazıyı hemen gizle
+            tapText.style.opacity = '0';
+
+            // 2. Kalbi patlat (explode animasyonu)
+            heart.classList.add('heart-expand');
+
+            // 3. Kalp patladıktan sonra ana ekranı getir
+            setTimeout(() => {
+                introScreen.classList.add('hidden-screen');
+
+                setTimeout(() => {
+                    introScreen.style.display = 'none'; // DOM'dan gizle
+                    mainScreen.style.visibility = 'visible';
+                    mainScreen.style.opacity = '1';
+                    glowOverlay.style.opacity = '1'; // Arka planı hafifçe aydınlat
+
+                    // Mektubu satır satır yavaşça getir (1.5 saniye gecikmelerle)
+                    paragraphs.forEach((p, index) => {
+                        setTimeout(() => {
+                            p.classList.add('visible');
+                        }, index * 1500); 
+                    });
+
+                }, 500); // Ekran geçişi süresi
+            }, 600); // Animasyon bitiş süresi
+        });
+    </script>
+</body>
+</html>
